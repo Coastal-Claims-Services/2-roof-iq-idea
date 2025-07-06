@@ -5,6 +5,8 @@ import { TechArchitecture } from "@/components/TechArchitecture";
 import { DemoSection } from "@/components/DemoSection";
 import { StormIntelligenceDemo } from "@/components/StormIntelligenceDemo";
 import { MLPerformanceDashboard } from "@/components/MLPerformanceDashboard";
+import { ReportGenerationPreview } from "@/components/ReportGenerationPreview";
+import { APITestingPlayground } from "@/components/APITestingPlayground";
 
 const Index = () => {
   return (
