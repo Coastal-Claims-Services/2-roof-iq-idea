@@ -1,8 +1,6 @@
 import { HeroSection } from "@/components/HeroSection";
 import { FeaturesComparison } from "@/components/FeaturesComparison";
-import { ROICalculator } from "@/components/ROICalculator";
 import { TechArchitecture } from "@/components/TechArchitecture";
-import { DemoSection } from "@/components/DemoSection";
 import { StormIntelligenceDemo } from "@/components/StormIntelligenceDemo";
 import { MLPerformanceDashboard } from "@/components/MLPerformanceDashboard";
 import { ReportGenerationPreview } from "@/components/ReportGenerationPreview";
@@ -15,8 +13,6 @@ const Index = () => {
       <StormIntelligenceDemo />
       <MLPerformanceDashboard />
       <FeaturesComparison />
-      <DemoSection />
-      <ROICalculator />
       <TechArchitecture />
     </div>
   );
