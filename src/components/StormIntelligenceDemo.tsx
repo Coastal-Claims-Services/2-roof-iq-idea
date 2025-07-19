@@ -13,18 +13,6 @@ import { Property, StormEvent, ProcessingJob } from '@/types/database';
 import { databaseService } from '@/services/database';
 import { weatherService } from '@/services/weather';
 
-interface StormEvent {
-  id: string;
-  type: 'hail' | 'wind' | 'tornado';
-  intensity: number;
-  confidence: number;
-  coordinates: [number, number];
-  path: [number, number][];
-  date: string;
-  maxWindSpeed?: number;
-  maxHailSize?: number;
-}
-
 interface PropertyData {
   address: string;
   coordinates: [number, number];
