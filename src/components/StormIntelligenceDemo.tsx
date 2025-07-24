@@ -239,30 +239,45 @@ export const StormIntelligenceDemo = () => {
           </p>
         </div>
 
-        {/* Mapbox Token Input */}
-        {!MAPBOX_TOKEN && (
-          <Card className="p-6 mb-8 max-w-md mx-auto">
-            <h3 className="text-lg font-semibold mb-4">Configure Mapbox Token</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Enter your Mapbox public token to enable map features. Get one from <a href="https://mapbox.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">mapbox.com</a>
+        {/* Mapbox Token Input - Always visible at top */}
+        <Card className="p-8 mb-8 max-w-2xl mx-auto border-2 border-primary/20">
+          <div className="text-center mb-6">
+            <h3 className="text-xl font-semibold mb-2">🗺️ Enter Mapbox API Token</h3>
+            <p className="text-muted-foreground">
+              Get your free public token from <a href="https://mapbox.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline font-medium">mapbox.com</a> to enable maps and address search
             </p>
-            <div className="flex gap-2">
-              <Input
-                type="text"
-                placeholder="pk.eyJ1..."
-                value={mapboxToken}
-                onChange={(e) => setMapboxToken(e.target.value)}
-                className="flex-1"
-              />
-              <Button 
-                onClick={() => toast.success("Token saved! You can now search addresses.")}
-                disabled={!mapboxToken.trim()}
-              >
-                Save
-              </Button>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Input
+              type="text"
+              placeholder="Enter your Mapbox public token (pk.eyJ1...)"
+              value={mapboxToken}
+              onChange={(e) => setMapboxToken(e.target.value)}
+              className="flex-1 h-12 text-center"
+            />
+            <Button 
+              onClick={() => {
+                if (mapboxToken.trim()) {
+                  toast.success("Mapbox token configured! You can now search addresses.");
+                } else {
+                  toast.error("Please enter a valid Mapbox token.");
+                }
+              }}
+              disabled={!mapboxToken.trim()}
+              size="lg"
+              className="min-w-[120px]"
+            >
+              {mapboxToken ? 'Update' : 'Configure'}
+            </Button>
+          </div>
+          {mapboxToken && (
+            <div className="mt-4 p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+              <p className="text-sm text-green-700 dark:text-green-300 text-center">
+                ✅ Mapbox configured! You can now search for addresses below.
+              </p>
             </div>
-          </Card>
-        )}
+          )}
+        </Card>
 
         {/* Address Search */}
         {MAPBOX_TOKEN && (
