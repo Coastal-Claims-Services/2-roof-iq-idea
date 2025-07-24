@@ -4,6 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { CloudLightning, Wind, AlertTriangle, Activity, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { AddressSearch } from "./AddressSearch";
@@ -34,9 +35,10 @@ export const StormIntelligenceDemo = () => {
   const [correlationScore, setCorrelationScore] = useState(0);
   const [currentJob, setCurrentJob] = useState<ProcessingJob | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [mapboxToken, setMapboxToken] = useState('');
 
-  // Use environment variable or fallback to demo mode
-  const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+  // Use local state for Mapbox token
+  const MAPBOX_TOKEN = mapboxToken;
 
   const initializeMap = (coordinates: [number, number]) => {
     if (!mapContainer.current || !MAPBOX_TOKEN || map.current) return;
@@ -237,10 +239,37 @@ export const StormIntelligenceDemo = () => {
           </p>
         </div>
 
+        {/* Mapbox Token Input */}
+        {!MAPBOX_TOKEN && (
+          <Card className="p-6 mb-8 max-w-md mx-auto">
+            <h3 className="text-lg font-semibold mb-4">Configure Mapbox Token</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Enter your Mapbox public token to enable map features. Get one from <a href="https://mapbox.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">mapbox.com</a>
+            </p>
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                placeholder="pk.eyJ1..."
+                value={mapboxToken}
+                onChange={(e) => setMapboxToken(e.target.value)}
+                className="flex-1"
+              />
+              <Button 
+                onClick={() => toast.success("Token saved! You can now search addresses.")}
+                disabled={!mapboxToken.trim()}
+              >
+                Save
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {/* Address Search */}
-        <div className="mb-8 max-w-md mx-auto">
-          <AddressSearch onAddressSelect={handleAddressSelect} />
-        </div>
+        {MAPBOX_TOKEN && (
+          <div className="mb-8 max-w-md mx-auto">
+            <AddressSearch onAddressSelect={handleAddressSelect} />
+          </div>
+        )}
 
         {selectedProperty && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -335,15 +364,6 @@ export const StormIntelligenceDemo = () => {
           </div>
         )}
 
-        {!selectedProperty && !MAPBOX_TOKEN && (
-          <Card className="p-8 text-center max-w-md mx-auto">
-            <AlertTriangle className="w-12 h-12 text-warning mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Configuration Required</h3>
-            <p className="text-sm text-muted-foreground">
-              To use the Storm Intelligence System, please configure your environment variables and connect to Supabase for backend services.
-            </p>
-          </Card>
-        )}
       </div>
     </section>
   );
