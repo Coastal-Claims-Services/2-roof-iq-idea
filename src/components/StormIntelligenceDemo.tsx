@@ -39,6 +39,11 @@ export const StormIntelligenceDemo = () => {
 
   // Use local state for Mapbox token
   const MAPBOX_TOKEN = mapboxToken;
+  
+  // Debug logging
+  console.log('Debug - mapboxToken:', mapboxToken);
+  console.log('Debug - MAPBOX_TOKEN:', MAPBOX_TOKEN);
+  console.log('Debug - Should show address search:', !!MAPBOX_TOKEN);
 
   const initializeMap = (coordinates: [number, number]) => {
     if (!mapContainer.current || !MAPBOX_TOKEN || map.current) return;
@@ -280,11 +285,18 @@ export const StormIntelligenceDemo = () => {
         </Card>
 
         {/* Address Search */}
-        {MAPBOX_TOKEN && (
-          <div className="mb-8 max-w-md mx-auto">
-            <AddressSearch onAddressSelect={handleAddressSelect} />
-          </div>
-        )}
+        <div className="mb-8">
+          <p className="text-center text-sm text-muted-foreground mb-4">
+            Debug: Token = "{mapboxToken}" | Show Search = {MAPBOX_TOKEN ? 'YES' : 'NO'}
+          </p>
+          {MAPBOX_TOKEN ? (
+            <div className="max-w-md mx-auto">
+              <AddressSearch onAddressSelect={handleAddressSelect} />
+            </div>
+          ) : (
+            <p className="text-center text-red-500">Address search hidden - token not detected</p>
+          )}
+        </div>
 
         {selectedProperty && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
