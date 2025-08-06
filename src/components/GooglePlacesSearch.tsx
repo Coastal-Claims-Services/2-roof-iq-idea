@@ -16,9 +16,9 @@ export const GooglePlacesSearch: React.FC<GooglePlacesSearchProps> = ({
   className = ""
 }) => {
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
-  const { isLoaded, loadError, isLoadingKey, hasValidKey } = useGoogleMaps();
+  const { isLoaded, loadError } = useGoogleMaps();
 
-  console.log('GooglePlacesSearch: Rendering - isLoaded:', isLoaded, 'hasValidKey:', hasValidKey, 'isLoadingKey:', isLoadingKey);
+  console.log('GooglePlacesSearch: Rendering - isLoaded:', isLoaded);
 
   const onLoad = useCallback((autocompleteInstance: google.maps.places.Autocomplete) => {
     console.log('GooglePlacesSearch: Autocomplete loaded');
@@ -49,28 +49,6 @@ export const GooglePlacesSearch: React.FC<GooglePlacesSearchProps> = ({
     return (
       <Card className="p-4">
         <p className="text-destructive">Error loading Google Maps: {loadError.message}</p>
-      </Card>
-    );
-  }
-
-  if (isLoadingKey) {
-    return (
-      <Card className="p-4">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span>Loading Google Places API...</span>
-        </div>
-      </Card>
-    );
-  }
-
-  if (!hasValidKey) {
-    return (
-      <Card className="p-4">
-        <div className="flex items-center gap-2 text-warning">
-          <MapPin className="h-4 w-4" />
-          <span>Google Places API key required for address search</span>
-        </div>
       </Card>
     );
   }
