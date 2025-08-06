@@ -8,6 +8,14 @@ import { supabase } from '@/integrations/supabase/client';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
+// Google Places types
+declare global {
+  interface Window {
+    google: any;
+    initializeGooglePlaces: () => void;
+  }
+}
+
 function App() {
   const [address, setAddress] = useState('');
   const [submittedAddress, setSubmittedAddress] = useState('');
@@ -22,10 +30,13 @@ function App() {
     perimeter: string;
   } | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
+  const autocompleteRef = useRef<any>(null);
+  const [selectedPlace, setSelectedPlace] = useState<any>(null);
 
   const handleMeasureRoof = () => {
     setIsLoading(true);
     setMeasurements(null); // Reset measurements
+    setSubmittedAddress(address);
     
     // Simulate loading
     setTimeout(() => {
@@ -142,6 +153,44 @@ function App() {
     pdf.save(`roof-report-${Date.now()}.pdf`);
   };
 
+  // Initialize Google Places Autocomplete
+  const initializeGooglePlaces = () => {
+    if (window.google && googleApiKey) {
+      const input = document.getElementById('address') as HTMLInputElement;
+      if (input && !autocompleteRef.current) {
+        autocompleteRef.current = new window.google.maps.places.Autocomplete(input, {
+          types: ['address'],
+          componentRestrictions: { country: 'us' }
+        });
+
+        autocompleteRef.current.addListener('place_changed', () => {
+          const place = autocompleteRef.current.getPlace();
+          if (place && place.geometry) {
+            setSelectedPlace(place);
+            setAddress(place.formatted_address || '');
+          }
+        });
+      }
+    }
+  };
+
+  // Load Google Places API when keys are ready
+  useEffect(() => {
+    if (googleApiKey && !window.google) {
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleApiKey}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        window.initializeGooglePlaces = initializeGooglePlaces;
+        initializeGooglePlaces();
+      };
+      document.head.appendChild(script);
+    } else if (googleApiKey && window.google) {
+      initializeGooglePlaces();
+    }
+  }, [googleApiKey]);
+
   // Fetch API keys on component mount
   useEffect(() => {
     fetchApiKeys();
@@ -155,8 +204,16 @@ function App() {
           // Set access token
           mapboxgl.accessToken = mapboxToken;
           
-          // Geocode the address
-          const coords = await geocodeAddress(submittedAddress);
+          // Get coordinates from Google Places if available, otherwise use Mapbox geocoding
+          let coords;
+          if (selectedPlace && selectedPlace.geometry) {
+            coords = {
+              lat: selectedPlace.geometry.location.lat(),
+              lng: selectedPlace.geometry.location.lng()
+            };
+          } else {
+            coords = await geocodeAddress(submittedAddress);
+          }
           
           // Initialize map
           const map = new mapboxgl.Map({
