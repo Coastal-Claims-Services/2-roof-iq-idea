@@ -17,9 +17,13 @@ function App() {
   const [address, setAddress] = useState('');
   const [submittedAddress, setSubmittedAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  // Use working hardcoded tokens
-  const mapboxToken = 'pk.eyJ1IjoiZnRkY2FkIiwiYSI6ImNtZTBsZ2w1dDA2ajcyam9oN2ZpejNqdWYifQ.yLDH0BiGgnK_UuXrzEHHVg';
-  const googleApiKey = 'AIzaSyDa9YJbm-_L8QSq8Q8K4Kq5N5p8KG3c3oY';
+  
+  // State for API keys from Supabase
+  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
+  const [googleApiKey, setGoogleApiKey] = useState<string | null>(null);
+  const [apiKeysLoading, setApiKeysLoading] = useState(true);
+  const [apiKeysError, setApiKeysError] = useState<string | null>(null);
+  
   const [measurements, setMeasurements] = useState<{
     area: string;
     squares: string;
@@ -139,14 +143,54 @@ function App() {
     }
   };
 
-  // Log that the app is ready with hardcoded tokens
+  // Fetch API keys from Supabase edge functions
   useEffect(() => {
-    console.log('RoofIQ app ready with hardcoded API tokens');
+    const fetchApiKeys = async () => {
+      try {
+        setApiKeysLoading(true);
+        setApiKeysError(null);
+
+        // Fetch both API keys in parallel
+        const [mapboxResponse, googleResponse] = await Promise.all([
+          supabase.functions.invoke('get-mapbox-token'),
+          supabase.functions.invoke('get-google-api-key')
+        ]);
+
+        if (mapboxResponse.error) {
+          throw new Error(`Mapbox token error: ${mapboxResponse.error.message}`);
+        }
+        if (googleResponse.error) {
+          throw new Error(`Google API key error: ${googleResponse.error.message}`);
+        }
+
+        const mapboxData = mapboxResponse.data;
+        const googleData = googleResponse.data;
+
+        if (!mapboxData?.token) {
+          throw new Error('Mapbox token not found in response');
+        }
+        if (!googleData?.apiKey) {
+          throw new Error('Google API key not found in response');
+        }
+
+        setMapboxToken(mapboxData.token);
+        setGoogleApiKey(googleData.apiKey);
+        
+        console.log('API keys fetched successfully from Supabase');
+      } catch (error) {
+        console.error('Failed to fetch API keys:', error);
+        setApiKeysError(error instanceof Error ? error.message : 'Failed to fetch API keys');
+      } finally {
+        setApiKeysLoading(false);
+      }
+    };
+
+    fetchApiKeys();
   }, []);
 
   // Initialize Mapbox when address is shown
   useEffect(() => {
-    if (submittedAddress && !isLoading) {
+    if (submittedAddress && !isLoading && mapboxToken) {
       const initializeMap = async () => {
         try {
           // Clean up existing map first
@@ -250,9 +294,41 @@ function App() {
         }
       };
     }
-  }, [submittedAddress, isLoading]);
+  }, [submittedAddress, isLoading, mapboxToken]);
 
-  console.log('Rendering main app UI', { mapboxToken, googleApiKey, googleLoaded, loadError });
+  console.log('Rendering main app UI', { mapboxToken, googleApiKey, googleLoaded, loadError, apiKeysLoading });
+
+  // Show API keys loading state
+  if (apiKeysLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-8">RoofIQ</h1>
+          <div className="flex items-center justify-center space-x-2 mb-4">
+            <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-gray-600">Loading API configuration...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show API keys error
+  if (apiKeysError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-8">RoofIQ</h1>
+          <div className="p-4 bg-red-50 border border-red-200 rounded-md mb-4">
+            <p className="text-sm text-red-700">{apiKeysError}</p>
+          </div>
+          <button onClick={() => window.location.reload()} className="w-full bg-blue-600 text-white py-2 px-4 rounded-md font-medium hover:bg-blue-700">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Show Google API loading error
   if (loadError) {
@@ -270,7 +346,6 @@ function App() {
       </div>
     );
   }
-
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
