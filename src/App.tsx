@@ -35,7 +35,7 @@ function App() {
 
   // Load Google Places API only when we have the API key
   const { isLoaded: googleLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: googleApiKey || undefined,
+    googleMapsApiKey: googleApiKey || '',
     libraries,
     preventGoogleFontsLoading: true,
   });
