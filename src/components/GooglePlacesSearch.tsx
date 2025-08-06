@@ -47,9 +47,17 @@ export const GooglePlacesSearch: React.FC<GooglePlacesSearchProps> = ({
         }
 
         if (data?.token) {
-          // Remove any prefix like "VITE_MAPBOX_TOKEN=" if present
-          const cleanToken = data.token.replace(/^.*?=/, '');
-          setGoogleApiKey(cleanToken);
+          // Only use tokens that look like Google API keys (start with AIza)
+          if (data.token.startsWith('AIza')) {
+            setGoogleApiKey(data.token);
+          } else {
+            console.warn('Invalid Google Places API key format:', data.token);
+            toast({
+              title: "Configuration Error",
+              description: "Invalid Google Places API key format. Please check your configuration.",
+              variant: "destructive"
+            });
+          }
         }
       } catch (error) {
         console.error('Error:', error);
