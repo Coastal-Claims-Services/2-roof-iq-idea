@@ -147,24 +147,34 @@ function App() {
   useEffect(() => {
     const fetchApiKeys = async () => {
       try {
+        console.log('Starting API key fetch from Supabase...');
         setApiKeysLoading(true);
         setApiKeysError(null);
 
         // Fetch both API keys in parallel
+        console.log('Calling Supabase edge functions...');
         const [mapboxResponse, googleResponse] = await Promise.all([
           supabase.functions.invoke('get-mapbox-token'),
           supabase.functions.invoke('get-google-api-key')
         ]);
 
+        console.log('Mapbox response:', mapboxResponse);
+        console.log('Google response:', googleResponse);
+
         if (mapboxResponse.error) {
+          console.error('Mapbox token error:', mapboxResponse.error);
           throw new Error(`Mapbox token error: ${mapboxResponse.error.message}`);
         }
         if (googleResponse.error) {
+          console.error('Google API key error:', googleResponse.error);
           throw new Error(`Google API key error: ${googleResponse.error.message}`);
         }
 
         const mapboxData = mapboxResponse.data;
         const googleData = googleResponse.data;
+
+        console.log('Mapbox data:', mapboxData);
+        console.log('Google data:', googleData);
 
         if (!mapboxData?.token) {
           throw new Error('Mapbox token not found in response');
@@ -176,7 +186,10 @@ function App() {
         setMapboxToken(mapboxData.token);
         setGoogleApiKey(googleData.apiKey);
         
-        console.log('API keys fetched successfully from Supabase');
+        console.log('API keys set successfully:', {
+          mapboxToken: mapboxData.token.substring(0, 10) + '...',
+          googleApiKey: googleData.apiKey.substring(0, 10) + '...'
+        });
       } catch (error) {
         console.error('Failed to fetch API keys:', error);
         setApiKeysError(error instanceof Error ? error.message : 'Failed to fetch API keys');
