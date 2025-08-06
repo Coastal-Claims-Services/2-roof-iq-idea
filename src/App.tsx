@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect, useRef } from 'react';
+import { useLoadScript } from '@react-google-maps/api';
 import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import * as turf from '@turf/turf';
@@ -8,15 +9,11 @@ import { supabase } from '@/integrations/supabase/client';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
-// Google Places types
-declare global {
-  interface Window {
-    google: any;
-    initializeGooglePlaces: () => void;
-  }
-}
+const libraries: "places"[] = ["places"];
 
 function App() {
+  console.log('App component rendering');
+  
   const [address, setAddress] = useState('');
   const [submittedAddress, setSubmittedAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,6 +29,12 @@ function App() {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const autocompleteRef = useRef<any>(null);
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
+
+  // Load Google Places API
+  const { isLoaded: googleLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: googleApiKey || '',
+    libraries,
+  });
 
   const handleMeasureRoof = () => {
     setIsLoading(true);
@@ -63,6 +66,7 @@ function App() {
   // Fetch API keys from Supabase Edge Functions
   const fetchApiKeys = async () => {
     try {
+      console.log('Fetching API keys...');
       setIsInitializing(true);
       setApiKeysError(null);
       
@@ -71,19 +75,26 @@ function App() {
         supabase.functions.invoke('get-google-api-key')
       ]);
       
+      console.log('Mapbox response:', mapboxResponse);
+      console.log('Google response:', googleResponse);
+      
       if (mapboxResponse.error) {
-        throw new Error('Failed to fetch Mapbox token');
+        console.error('Mapbox error:', mapboxResponse.error);
+        throw new Error(`Failed to fetch Mapbox token: ${mapboxResponse.error.message}`);
       }
       
       if (googleResponse.error) {
-        throw new Error('Failed to fetch Google API key');
+        console.error('Google error:', googleResponse.error);
+        throw new Error(`Failed to fetch Google API key: ${googleResponse.error.message}`);
       }
       
-      setMapboxToken(mapboxResponse.data.token);
-      setGoogleApiKey(googleResponse.data.apiKey);
+      console.log('Setting API keys...');
+      setMapboxToken(mapboxResponse.data?.token);
+      setGoogleApiKey(googleResponse.data?.apiKey);
+      console.log('API keys set successfully');
     } catch (error) {
       console.error('Error fetching API keys:', error);
-      setApiKeysError('Failed to load API keys. Please try again.');
+      setApiKeysError(error instanceof Error ? error.message : 'Failed to load API keys. Please try again.');
     } finally {
       setIsInitializing(false);
     }
@@ -155,44 +166,48 @@ function App() {
 
   // Initialize Google Places Autocomplete
   const initializeGooglePlaces = () => {
-    if (window.google && googleApiKey) {
+    console.log('Initializing Google Places...', { googleLoaded, googleApiKey });
+    
+    if (googleLoaded && window.google?.maps?.places) {
       const input = document.getElementById('address') as HTMLInputElement;
       if (input && !autocompleteRef.current) {
-        autocompleteRef.current = new window.google.maps.places.Autocomplete(input, {
-          types: ['address'],
-          componentRestrictions: { country: 'us' }
-        });
+        console.log('Creating autocomplete instance...');
+        try {
+          autocompleteRef.current = new window.google.maps.places.Autocomplete(input, {
+            types: ['address'],
+            componentRestrictions: { country: 'us' }
+          });
 
-        autocompleteRef.current.addListener('place_changed', () => {
-          const place = autocompleteRef.current.getPlace();
-          if (place && place.geometry) {
-            setSelectedPlace(place);
-            setAddress(place.formatted_address || '');
-          }
-        });
+          autocompleteRef.current.addListener('place_changed', () => {
+            const place = autocompleteRef.current.getPlace();
+            console.log('Place selected:', place);
+            if (place && place.geometry) {
+              setSelectedPlace(place);
+              setAddress(place.formatted_address || '');
+            }
+          });
+          
+          console.log('Google Places autocomplete initialized successfully');
+        } catch (error) {
+          console.error('Error initializing Google Places:', error);
+        }
       }
     }
   };
 
-  // Load Google Places API when keys are ready
+  // Initialize Google Places when ready
   useEffect(() => {
-    if (googleApiKey && !window.google) {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleApiKey}&libraries=places`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        window.initializeGooglePlaces = initializeGooglePlaces;
-        initializeGooglePlaces();
-      };
-      document.head.appendChild(script);
-    } else if (googleApiKey && window.google) {
+    if (googleLoaded && googleApiKey) {
+      console.log('Google Places API loaded, initializing...');
       initializeGooglePlaces();
+    } else if (loadError) {
+      console.error('Error loading Google Places API:', loadError);
     }
-  }, [googleApiKey]);
+  }, [googleLoaded, googleApiKey, loadError]);
 
   // Fetch API keys on component mount
   useEffect(() => {
+    console.log('Component mounted, fetching API keys...');
     fetchApiKeys();
   }, []);
 
@@ -285,6 +300,7 @@ function App() {
 
   // Show loading screen while fetching API keys
   if (isInitializing) {
+    console.log('Rendering loading screen');
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
@@ -293,7 +309,9 @@ function App() {
           </h1>
           <div className="flex items-center justify-center space-x-2">
             <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-sm text-gray-700">Initializing app...</p>
+            <p className="text-sm text-gray-700">
+              Initializing app... {mapboxToken ? '✓ Mapbox' : '⏳ Mapbox'} {googleApiKey ? '✓ Google' : '⏳ Google'}
+            </p>
           </div>
         </div>
       </div>
@@ -302,6 +320,7 @@ function App() {
 
   // Show error screen if API keys failed to load
   if (apiKeysError) {
+    console.log('Rendering error screen:', apiKeysError);
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
@@ -321,6 +340,8 @@ function App() {
       </div>
     );
   }
+
+  console.log('Rendering main app UI', { mapboxToken, googleApiKey, googleLoaded });
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
