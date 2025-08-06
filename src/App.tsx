@@ -44,6 +44,25 @@ function App() {
     return (perimeter * 3.28084).toFixed(0);
   };
 
+  // Geocode address using Mapbox API
+  const geocodeAddress = async (address: string) => {
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=pk.eyJ1IjoibWFpbG1vdmUiLCJhIjoiY20wZnhrbjV3MDVkNTJrcjF1MjlpaWFqZiJ9.xKwF94J4sYw-AEfGXcoUHg`
+      );
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        const [lng, lat] = data.features[0].center;
+        return { lat, lng };
+      }
+      throw new Error('Address not found');
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      throw error;
+    }
+  };
+
   // Generate PDF Report
   const generatePDF = () => {
     if (!measurements || !mapRef.current) return;
@@ -88,67 +107,79 @@ function App() {
   // Initialize Mapbox when address is shown
   useEffect(() => {
     if (submittedAddress && !isLoading) {
-      // Set access token
-      mapboxgl.accessToken = 'pk.eyJ1IjoibWFpbG1vdmUiLCJhIjoiY20wZnhrbjV3MDVkNTJrcjF1MjlpaWFqZiJ9.xKwF94J4sYw-AEfGXcoUHg';
-      
-      // Initialize map
-      const map = new mapboxgl.Map({
-        container: 'map',
-        style: 'mapbox://styles/mapbox/satellite-v9',
-        center: [-74.0060, 40.7128], // NYC for now
-        zoom: 20,
-        pitch: 0
-      });
+      const initializeMap = async () => {
+        try {
+          // Set access token
+          mapboxgl.accessToken = 'pk.eyJ1IjoibWFpbG1vdmUiLCJhIjoiY20wZnhrbjV3MDVkNTJrcjF1MjlpaWFqZiJ9.xKwF94J4sYw-AEfGXcoUHg';
+          
+          // Geocode the address
+          const coords = await geocodeAddress(submittedAddress);
+          
+          // Initialize map
+          const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/satellite-v9',
+            center: [coords.lng, coords.lat],
+            zoom: 20,
+            pitch: 0
+          });
 
-      // Store map reference
-      mapRef.current = map;
+          // Store map reference
+          mapRef.current = map;
 
-      // Add drawing controls
-      const draw = new MapboxDraw({
-        displayControlsDefault: false,
-        controls: {
-          polygon: true,
-          trash: true
+          // Add drawing controls
+          const draw = new MapboxDraw({
+            displayControlsDefault: false,
+            controls: {
+              polygon: true,
+              trash: true
+            }
+          });
+          
+          map.addControl(draw);
+
+          // Listen for when drawing is completed
+          map.on('draw.create', (e: any) => {
+            const feature = e.features[0];
+            
+            // Calculate area in square meters
+            const areaMeters = turf.area(feature);
+            
+            // Convert to square feet (1 meter = 3.28084 feet, so 1 sq meter = 10.764 sq feet)
+            const areaFeet = areaMeters * 10.764;
+            
+            // Calculate roofing squares (1 square = 100 sq ft)
+            const squares = (areaFeet / 100).toFixed(2);
+            
+            // Calculate perimeter
+            const perimeter = calculatePerimeter(feature);
+            
+            // Display the results
+            setMeasurements({
+              area: areaFeet.toFixed(0),
+              squares: squares,
+              perimeter: perimeter
+            });
+            
+            console.log('Roof measurements:', {
+              area: areaFeet.toFixed(0) + ' sq ft',
+              squares: squares + ' squares',
+              perimeter: perimeter + ' ft'
+            });
+          });
+
+          // Cleanup function
+          return () => {
+            mapRef.current = null;
+            map.remove();
+          };
+        } catch (error) {
+          console.error('Failed to initialize map:', error);
+          alert('Failed to find address. Please try a different address.');
         }
-      });
-      
-      map.addControl(draw);
-
-      // Listen for when drawing is completed
-      map.on('draw.create', (e: any) => {
-        const feature = e.features[0];
-        
-        // Calculate area in square meters
-        const areaMeters = turf.area(feature);
-        
-        // Convert to square feet (1 meter = 3.28084 feet, so 1 sq meter = 10.764 sq feet)
-        const areaFeet = areaMeters * 10.764;
-        
-        // Calculate roofing squares (1 square = 100 sq ft)
-        const squares = (areaFeet / 100).toFixed(2);
-        
-        // Calculate perimeter
-        const perimeter = calculatePerimeter(feature);
-        
-        // Display the results
-        setMeasurements({
-          area: areaFeet.toFixed(0),
-          squares: squares,
-          perimeter: perimeter
-        });
-        
-        console.log('Roof measurements:', {
-          area: areaFeet.toFixed(0) + ' sq ft',
-          squares: squares + ' squares',
-          perimeter: perimeter + ' ft'
-        });
-      });
-
-      // Cleanup function
-      return () => {
-        mapRef.current = null;
-        map.remove();
       };
+      
+      initializeMap();
     }
   }, [submittedAddress, isLoading]);
 
