@@ -14,20 +14,92 @@ interface GooglePlacesSearchProps {
 
 const libraries: ("places")[] = ["places"];
 
+// Component that loads Google Places API only when key is available
+const GooglePlacesLoader: React.FC<GooglePlacesSearchProps & { apiKey: string }> = ({
+  onAddressSelect,
+  className = "",
+  apiKey
+}) => {
+  const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: apiKey,
+    libraries
+  });
+
+  const onLoad = useCallback((autocompleteInstance: google.maps.places.Autocomplete) => {
+    setAutocomplete(autocompleteInstance);
+  }, []);
+
+  const onPlaceChanged = useCallback(() => {
+    if (autocomplete !== null) {
+      const place = autocomplete.getPlace();
+      
+      if (place.geometry && place.geometry.location) {
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+        const address = place.formatted_address || place.name || '';
+        
+        onAddressSelect(address, [lng, lat]);
+        
+        toast({
+          title: "Address Selected",
+          description: `Flying to ${address}`,
+        });
+      }
+    }
+  }, [autocomplete, onAddressSelect]);
+
+  if (loadError) {
+    return (
+      <Card className="p-4">
+        <p className="text-destructive">Error loading Google Maps</p>
+      </Card>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <Card className="p-4">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Loading Maps API...</span>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <div className={`relative ${className}`}>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Autocomplete
+            onLoad={onLoad}
+            onPlaceChanged={onPlaceChanged}
+            options={{
+              types: ['address'],
+              componentRestrictions: { country: 'US' }
+            }}
+          >
+            <Input
+              placeholder="Enter property address..."
+              className="pl-10"
+            />
+          </Autocomplete>
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const GooglePlacesSearch: React.FC<GooglePlacesSearchProps> = ({
   onAddressSelect,
   className = ""
 }) => {
-  const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   const [isLoadingKey, setIsLoadingKey] = useState(false);
   const [googleApiKey, setGoogleApiKey] = useState<string>('');
-
-  // Load Google Maps API
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: googleApiKey,
-    libraries
-  });
 
   // Fetch Google Places API key from Supabase
   React.useEffect(() => {
@@ -74,37 +146,6 @@ export const GooglePlacesSearch: React.FC<GooglePlacesSearchProps> = ({
     fetchGoogleKey();
   }, []);
 
-  const onLoad = useCallback((autocompleteInstance: google.maps.places.Autocomplete) => {
-    setAutocomplete(autocompleteInstance);
-  }, []);
-
-  const onPlaceChanged = useCallback(() => {
-    if (autocomplete !== null) {
-      const place = autocomplete.getPlace();
-      
-      if (place.geometry && place.geometry.location) {
-        const lat = place.geometry.location.lat();
-        const lng = place.geometry.location.lng();
-        const address = place.formatted_address || place.name || '';
-        
-        onAddressSelect(address, [lng, lat]);
-        
-        toast({
-          title: "Address Selected",
-          description: `Flying to ${address}`,
-        });
-      }
-    }
-  }, [autocomplete, onAddressSelect]);
-
-  if (loadError) {
-    return (
-      <Card className="p-4">
-        <p className="text-destructive">Error loading Google Maps</p>
-      </Card>
-    );
-  }
-
   if (isLoadingKey) {
     return (
       <Card className="p-4">
@@ -127,37 +168,11 @@ export const GooglePlacesSearch: React.FC<GooglePlacesSearchProps> = ({
     );
   }
 
-  if (!isLoaded) {
-    return (
-      <Card className="p-4">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span>Loading Maps API...</span>
-        </div>
-      </Card>
-    );
-  }
-
   return (
-    <div className={`relative ${className}`}>
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Autocomplete
-            onLoad={onLoad}
-            onPlaceChanged={onPlaceChanged}
-            options={{
-              types: ['address'],
-              componentRestrictions: { country: 'US' }
-            }}
-          >
-            <Input
-              placeholder="Enter property address..."
-              className="pl-10"
-            />
-          </Autocomplete>
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        </div>
-      </div>
-    </div>
+    <GooglePlacesLoader 
+      apiKey={googleApiKey}
+      onAddressSelect={onAddressSelect}
+      className={className}
+    />
   );
 };
