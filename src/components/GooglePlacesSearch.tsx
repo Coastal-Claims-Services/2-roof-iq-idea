@@ -47,7 +47,9 @@ export const GooglePlacesSearch: React.FC<GooglePlacesSearchProps> = ({
         }
 
         if (data?.token) {
-          setGoogleApiKey(data.token);
+          // Remove any prefix like "VITE_MAPBOX_TOKEN=" if present
+          const cleanToken = data.token.replace(/^.*?=/, '');
+          setGoogleApiKey(cleanToken);
         }
       } catch (error) {
         console.error('Error:', error);
