@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import Map from './components/Map';
+import React, { useState, useEffect } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 function App() {
   const [address, setAddress] = useState('');
@@ -15,6 +16,26 @@ function App() {
       setIsLoading(false);
     }, 2000);
   };
+
+  // Initialize Mapbox when address is shown
+  useEffect(() => {
+    if (submittedAddress && !isLoading) {
+      // Set access token
+      mapboxgl.accessToken = 'pk.eyJ1IjoibWFpbG1vdmUiLCJhIjoiY20wZnhrbjV3MDVkNTJrcjF1MjlpaWFqZiJ9.xKwF94J4sYw-AEfGXcoUHg';
+      
+      // Initialize map
+      const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/satellite-v9',
+        center: [-74.0060, 40.7128], // NYC for now
+        zoom: 20,
+        pitch: 0
+      });
+
+      // Cleanup function
+      return () => map.remove();
+    }
+  }, [submittedAddress, isLoading]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -72,7 +93,11 @@ function App() {
                 <h3 className="text-lg font-medium text-gray-900 mb-3">
                   Satellite View
                 </h3>
-                <Map latitude={40.7128} longitude={-74.0060} />
+                <div 
+                  id="map" 
+                  className="w-full h-96 rounded-lg shadow-lg"
+                  style={{ height: '400px', marginTop: '20px' }}
+                />
               </div>
             </div>
           )}
