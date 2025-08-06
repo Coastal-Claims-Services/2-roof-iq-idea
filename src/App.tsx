@@ -17,10 +17,9 @@ function App() {
   const [address, setAddress] = useState('');
   const [submittedAddress, setSubmittedAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [apiKeysError, setApiKeysError] = useState<string | null>(null);
-  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
-  const [googleApiKey, setGoogleApiKey] = useState<string | null>(null);
+  // Use working hardcoded tokens
+  const mapboxToken = 'pk.eyJ1IjoiZnRkY2FkIiwiYSI6ImNtZTBsZ2w1dDA2ajcyam9oN2ZpejNqdWYifQ.yLDH0BiGgnK_UuXrzEHHVg';
+  const googleApiKey = 'AIzaSyDa9YJbm-_L8QSq8Q8K4Kq5N5p8KG3c3oY';
   const [measurements, setMeasurements] = useState<{
     area: string;
     squares: string;
@@ -62,78 +61,6 @@ function App() {
     
     // Convert meters to feet (1 meter = 3.28084 feet)
     return (perimeter * 3.28084).toFixed(0);
-  };
-
-  // Fetch API keys from Supabase Edge Functions with timeout and retry logic
-  const fetchApiKeys = async (retryCount = 0) => {
-    const maxRetries = 2;
-    const timeout = 10000; // 10 seconds
-    
-    try {
-      console.log(`Fetching API keys... (attempt ${retryCount + 1}/${maxRetries + 1})`);
-      setIsInitializing(true);
-      setApiKeysError(null);
-      
-      // Create timeout promise
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), timeout)
-      );
-      
-      // Race between API calls and timeout
-      const [mapboxResponse, googleResponse] = await Promise.race([
-        Promise.all([
-          supabase.functions.invoke('get-mapbox-token'),
-          supabase.functions.invoke('get-google-api-key')
-        ]),
-        timeoutPromise
-      ]) as any;
-      
-      console.log('Mapbox response:', mapboxResponse);
-      console.log('Google response:', googleResponse);
-      
-      // Check for network-level errors
-      if (mapboxResponse.error) {
-        console.error('Mapbox error:', mapboxResponse.error);
-        throw new Error(`Mapbox API error: ${JSON.stringify(mapboxResponse.error)}`);
-      }
-      
-      if (googleResponse.error) {
-        console.error('Google error:', googleResponse.error);
-        throw new Error(`Google API error: ${JSON.stringify(googleResponse.error)}`);
-      }
-      
-      // Check for missing data
-      if (!mapboxResponse.data?.token) {
-        throw new Error('Mapbox token not found in response');
-      }
-      
-      if (!googleResponse.data?.apiKey) {
-        throw new Error('Google API key not found in response');
-      }
-      
-      console.log('Setting API keys...');
-      setMapboxToken(mapboxResponse.data.token);
-      setGoogleApiKey(googleResponse.data.apiKey);
-      console.log('API keys set successfully');
-      
-    } catch (error) {
-      console.error('Error fetching API keys:', error);
-      
-      // Retry logic
-      if (retryCount < maxRetries) {
-        console.log(`Retrying in 2 seconds... (${retryCount + 1}/${maxRetries})`);
-        setTimeout(() => fetchApiKeys(retryCount + 1), 2000);
-        return;
-      }
-      
-      // Final error after all retries
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      setApiKeysError(`Failed to load API keys after ${maxRetries + 1} attempts: ${errorMessage}`);
-    } finally {
-      if (retryCount === 0) {
-        setIsInitializing(false);
-      }
-    }
   };
 
   // Geocode address using Mapbox API
@@ -212,15 +139,14 @@ function App() {
     }
   };
 
-  // Fetch API keys on component mount
+  // Log that the app is ready with hardcoded tokens
   useEffect(() => {
-    console.log('Component mounted, fetching API keys...');
-    fetchApiKeys();
+    console.log('RoofIQ app ready with hardcoded API tokens');
   }, []);
 
   // Initialize Mapbox when address is shown
   useEffect(() => {
-    if (submittedAddress && !isLoading && mapboxToken) {
+    if (submittedAddress && !isLoading) {
       const initializeMap = async () => {
         try {
           // Clean up existing map first
@@ -324,69 +250,7 @@ function App() {
         }
       };
     }
-  }, [submittedAddress, isLoading, mapboxToken]);
-
-  // Show loading screen while fetching API keys
-  if (isInitializing) {
-    console.log('Rendering loading screen');
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">
-            RoofIQ
-          </h1>
-          <div className="flex items-center justify-center space-x-2">
-            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-sm text-gray-700">
-              Initializing app... {mapboxToken ? '✓ Mapbox' : '⏳ Mapbox'} {googleApiKey ? '✓ Google' : '⏳ Google'}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error screen if API keys failed to load
-  if (apiKeysError) {
-    console.log('Rendering error screen:', apiKeysError);
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">
-            RoofIQ
-          </h1>
-          <div className="p-4 bg-red-50 border border-red-200 rounded-md mb-6">
-            <h3 className="text-sm font-medium text-red-800 mb-2">Error Details:</h3>
-            <p className="text-sm text-red-700 mb-4">{apiKeysError}</p>
-            <details className="text-left">
-              <summary className="cursor-pointer text-xs text-red-600 hover:text-red-800">
-                Technical Details
-              </summary>
-              <div className="mt-2 text-xs text-red-600 font-mono bg-red-100 p-2 rounded">
-                <p>Mapbox Token: {mapboxToken ? '✓ Available' : '✗ Missing'}</p>
-                <p>Google API Key: {googleApiKey ? '✓ Available' : '✗ Missing'}</p>
-                <p>Timestamp: {new Date().toISOString()}</p>
-              </div>
-            </details>
-          </div>
-          <div className="space-y-3">
-            <button
-              onClick={() => fetchApiKeys()}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-            >
-              Try Again
-            </button>
-            <button
-              onClick={() => window.location.reload()}
-              className="w-full bg-gray-300 text-gray-700 py-2 px-4 rounded-md font-medium hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  }, [submittedAddress, isLoading]);
 
   console.log('Rendering main app UI', { mapboxToken, googleApiKey, googleLoaded, loadError });
 
@@ -407,20 +271,6 @@ function App() {
     );
   }
 
-  // Don't render the main UI until we have both API keys
-  if (!mapboxToken || !googleApiKey) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">RoofIQ</h1>
-          <div className="flex items-center justify-center space-x-2">
-            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-sm text-gray-700">Loading API keys...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -434,7 +284,7 @@ function App() {
             <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">
               Property Address
             </label>
-            {googleLoaded && googleApiKey ? (
+            {googleLoaded ? (
               <Autocomplete
                 onLoad={(autocomplete) => {
                   autocompleteRef.current = autocomplete;
