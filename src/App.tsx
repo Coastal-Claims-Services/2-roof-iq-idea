@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Map from './components/Map';
 
 function App() {
   const [address, setAddress] = useState('');
@@ -57,13 +58,22 @@ function App() {
           )}
           
           {submittedAddress && !isLoading && (
-            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-md">
-              <h3 className="text-sm font-medium text-green-800 mb-1">
-                Selected Address:
-              </h3>
-              <p className="text-sm text-green-700">
-                {submittedAddress}
-              </p>
+            <div className="space-y-6">
+              <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                <h3 className="text-sm font-medium text-green-800 mb-1">
+                  Selected Address:
+                </h3>
+                <p className="text-sm text-green-700">
+                  {submittedAddress}
+                </p>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-3">
+                  Satellite View
+                </h3>
+                <Map latitude={40.7128} longitude={-74.0060} />
+              </div>
             </div>
           )}
         </div>
