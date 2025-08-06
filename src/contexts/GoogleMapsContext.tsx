@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
 import { supabase } from '@/integrations/supabase/client';
 
+// Define libraries outside component to maintain stable reference
 const libraries: ("places")[] = ["places"];
 
 interface GoogleMapsContextType {
@@ -30,10 +31,31 @@ interface GoogleMapsProviderProps {
   children: React.ReactNode;
 }
 
+// Separate component for Google Maps loading to prevent re-initialization
+const GoogleMapsLoader: React.FC<{ 
+  apiKey: string;
+  children: React.ReactNode;
+  onStatusChange: (isLoaded: boolean, loadError: Error | undefined) => void;
+}> = ({ apiKey, children, onStatusChange }) => {
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: apiKey,
+    libraries: libraries, // Stable reference
+  });
+
+  useEffect(() => {
+    onStatusChange(isLoaded, loadError);
+  }, [isLoaded, loadError, onStatusChange]);
+
+  return <>{children}</>;
+};
+
 export const GoogleMapsProvider: React.FC<GoogleMapsProviderProps> = ({ children }) => {
   const [googleApiKey, setGoogleApiKey] = useState<string>('');
   const [isLoadingKey, setIsLoadingKey] = useState(true);
   const [hasValidKey, setHasValidKey] = useState(false);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
+  const [mapsLoadError, setMapsLoadError] = useState<Error | undefined>();
 
   // Fetch Google Places API key from Supabase
   useEffect(() => {
@@ -67,24 +89,37 @@ export const GoogleMapsProvider: React.FC<GoogleMapsProviderProps> = ({ children
     fetchGoogleKey();
   }, []);
 
-  // Only load Google Maps API if we have a valid key
-  const shouldLoadApi = hasValidKey && googleApiKey && !isLoadingKey;
-  
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: shouldLoadApi ? googleApiKey : '',
-    libraries: shouldLoadApi ? libraries : undefined,
-  });
+  const handleMapsStatusChange = React.useCallback((isLoaded: boolean, loadError: Error | undefined) => {
+    setMapsLoaded(isLoaded);
+    setMapsLoadError(loadError);
+  }, []);
 
-  console.log('GoogleMapsProvider: Status - isLoadingKey:', isLoadingKey, 'hasValidKey:', hasValidKey, 'shouldLoadApi:', shouldLoadApi, 'isLoaded:', isLoaded);
+  console.log('GoogleMapsProvider: Status - isLoadingKey:', isLoadingKey, 'hasValidKey:', hasValidKey, 'mapsLoaded:', mapsLoaded);
 
+  const contextValue = {
+    isLoaded: hasValidKey && mapsLoaded,
+    loadError: mapsLoadError,
+    isLoadingKey,
+    hasValidKey,
+  };
+
+  // Only render GoogleMapsLoader when we have a valid API key
+  if (hasValidKey && googleApiKey && !isLoadingKey) {
+    return (
+      <GoogleMapsLoader 
+        apiKey={googleApiKey} 
+        onStatusChange={handleMapsStatusChange}
+      >
+        <GoogleMapsContext.Provider value={contextValue}>
+          {children}
+        </GoogleMapsContext.Provider>
+      </GoogleMapsLoader>
+    );
+  }
+
+  // Render without Google Maps loader when key is not available
   return (
-    <GoogleMapsContext.Provider value={{
-      isLoaded: shouldLoadApi ? isLoaded : false,
-      loadError,
-      isLoadingKey,
-      hasValidKey,
-    }}>
+    <GoogleMapsContext.Provider value={contextValue}>
       {children}
     </GoogleMapsContext.Provider>
   );
