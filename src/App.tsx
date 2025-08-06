@@ -4,6 +4,7 @@ import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import * as turf from '@turf/turf';
 import { jsPDF } from 'jspdf';
+import { supabase } from '@/integrations/supabase/client';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
@@ -11,6 +12,10 @@ function App() {
   const [address, setAddress] = useState('');
   const [submittedAddress, setSubmittedAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [apiKeysError, setApiKeysError] = useState<string | null>(null);
+  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
+  const [googleApiKey, setGoogleApiKey] = useState<string | null>(null);
   const [measurements, setMeasurements] = useState<{
     area: string;
     squares: string;
@@ -44,11 +49,44 @@ function App() {
     return (perimeter * 3.28084).toFixed(0);
   };
 
+  // Fetch API keys from Supabase Edge Functions
+  const fetchApiKeys = async () => {
+    try {
+      setIsInitializing(true);
+      setApiKeysError(null);
+      
+      const [mapboxResponse, googleResponse] = await Promise.all([
+        supabase.functions.invoke('get-mapbox-token'),
+        supabase.functions.invoke('get-google-api-key')
+      ]);
+      
+      if (mapboxResponse.error) {
+        throw new Error('Failed to fetch Mapbox token');
+      }
+      
+      if (googleResponse.error) {
+        throw new Error('Failed to fetch Google API key');
+      }
+      
+      setMapboxToken(mapboxResponse.data.token);
+      setGoogleApiKey(googleResponse.data.apiKey);
+    } catch (error) {
+      console.error('Error fetching API keys:', error);
+      setApiKeysError('Failed to load API keys. Please try again.');
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
   // Geocode address using Mapbox API
   const geocodeAddress = async (address: string) => {
+    if (!mapboxToken) {
+      throw new Error('Mapbox token not available');
+    }
+    
     try {
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=pk.eyJ1IjoibWFpbG1vdmUiLCJhIjoiY20wZnhrbjV3MDVkNTJrcjF1MjlpaWFqZiJ9.xKwF94J4sYw-AEfGXcoUHg`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${mapboxToken}`
       );
       const data = await response.json();
       
@@ -104,13 +142,18 @@ function App() {
     pdf.save(`roof-report-${Date.now()}.pdf`);
   };
 
+  // Fetch API keys on component mount
+  useEffect(() => {
+    fetchApiKeys();
+  }, []);
+
   // Initialize Mapbox when address is shown
   useEffect(() => {
-    if (submittedAddress && !isLoading) {
+    if (submittedAddress && !isLoading && mapboxToken) {
       const initializeMap = async () => {
         try {
           // Set access token
-          mapboxgl.accessToken = 'pk.eyJ1IjoibWFpbG1vdmUiLCJhIjoiY20wZnhrbjV3MDVkNTJrcjF1MjlpaWFqZiJ9.xKwF94J4sYw-AEfGXcoUHg';
+          mapboxgl.accessToken = mapboxToken;
           
           // Geocode the address
           const coords = await geocodeAddress(submittedAddress);
@@ -181,7 +224,46 @@ function App() {
       
       initializeMap();
     }
-  }, [submittedAddress, isLoading]);
+  }, [submittedAddress, isLoading, mapboxToken]);
+
+  // Show loading screen while fetching API keys
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-8">
+            RoofIQ
+          </h1>
+          <div className="flex items-center justify-center space-x-2">
+            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-sm text-gray-700">Initializing app...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error screen if API keys failed to load
+  if (apiKeysError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-8">
+            RoofIQ
+          </h1>
+          <div className="p-4 bg-red-50 border border-red-200 rounded-md mb-4">
+            <p className="text-sm text-red-700">{apiKeysError}</p>
+          </div>
+          <button
+            onClick={fetchApiKeys}
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
