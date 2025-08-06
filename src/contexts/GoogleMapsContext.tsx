@@ -25,10 +25,12 @@ export function GoogleMapsProvider({ children }: { children: React.ReactNode }) 
       try {
         const { data, error } = await supabase.functions.invoke('get-google-places-token');
         if (error) throw error;
-        setApiKey(data.token || '');
+        const key = data.token || null;
+        console.log('GoogleMapsContext: API key fetched:', key ? 'Valid key loaded' : 'No key received');
+        setApiKey(key);
       } catch (error) {
         console.error('Failed to fetch Google API key:', error);
-        setApiKey(''); // Set empty string on error
+        setApiKey(null); // Set null on error to prevent initialization
       } finally {
         setKeyLoaded(true);
       }
@@ -42,7 +44,8 @@ export function GoogleMapsProvider({ children }: { children: React.ReactNode }) 
   }
 
   // Only render the provider with Google Maps if we have a valid key
-  if (!apiKey) {
+  if (!apiKey || apiKey.length === 0) {
+    console.log('GoogleMapsContext: No valid API key, rendering without Google Maps');
     return (
       <GoogleMapsContext.Provider value={{ isLoaded: false, loadError: new Error('No API key') }}>
         {children}
