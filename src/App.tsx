@@ -1,8 +1,9 @@
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import * as turf from '@turf/turf';
+import { jsPDF } from 'jspdf';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
@@ -15,6 +16,7 @@ function App() {
     squares: string;
     perimeter: string;
   } | null>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
 
   const handleMeasureRoof = () => {
     setIsLoading(true);
@@ -42,6 +44,47 @@ function App() {
     return (perimeter * 3.28084).toFixed(0);
   };
 
+  // Generate PDF Report
+  const generatePDF = () => {
+    if (!measurements || !mapRef.current) return;
+
+    const pdf = new jsPDF();
+    
+    // Page 1 - Report Summary
+    pdf.setFontSize(20);
+    pdf.text('Premium Report', 105, 20, { align: 'center' });
+    
+    pdf.setFontSize(12);
+    pdf.text(`Date: ${new Date().toLocaleDateString()}`, 20, 40);
+    pdf.text(`Address: ${submittedAddress}`, 20, 50);
+    
+    // Measurements section
+    pdf.setFontSize(16);
+    pdf.text('Measurements', 20, 70);
+    
+    pdf.setFontSize(12);
+    pdf.text(`Total Roof Area = ${measurements.area} sq ft`, 20, 85);
+    pdf.text(`Roofing Squares = ${measurements.squares}`, 20, 95);
+    pdf.text(`Perimeter = ${measurements.perimeter} ft`, 20, 105);
+    
+    // Waste calculation table
+    pdf.text('Waste Calculation (16% suggested):', 20, 125);
+    const areaWithWaste = (parseFloat(measurements.area) * 1.16).toFixed(0);
+    pdf.text(`Area with 16% waste = ${areaWithWaste} sq ft`, 20, 135);
+    
+    // Page 2 - Add captured map image
+    pdf.addPage();
+    pdf.text('Roof Diagram', 105, 20, { align: 'center' });
+    
+    // Capture map canvas and add to PDF
+    const mapCanvas = mapRef.current.getCanvas();
+    const imgData = mapCanvas.toDataURL('image/png');
+    pdf.addImage(imgData, 'PNG', 20, 40, 170, 120);
+    
+    // Save the PDF
+    pdf.save(`roof-report-${Date.now()}.pdf`);
+  };
+
   // Initialize Mapbox when address is shown
   useEffect(() => {
     if (submittedAddress && !isLoading) {
@@ -56,6 +99,9 @@ function App() {
         zoom: 20,
         pitch: 0
       });
+
+      // Store map reference
+      mapRef.current = map;
 
       // Add drawing controls
       const draw = new MapboxDraw({
@@ -99,7 +145,10 @@ function App() {
       });
 
       // Cleanup function
-      return () => map.remove();
+      return () => {
+        mapRef.current = null;
+        map.remove();
+      };
     }
   }, [submittedAddress, isLoading]);
 
@@ -188,6 +237,12 @@ function App() {
                       <span className="font-medium text-blue-900">{measurements.perimeter} ft</span>
                     </div>
                   </div>
+                  <button
+                    onClick={generatePDF}
+                    className="mt-4 w-full bg-green-600 text-white py-2 px-4 rounded-md font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
+                  >
+                    Generate PDF Report
+                  </button>
                 </div>
               )}
             </div>
