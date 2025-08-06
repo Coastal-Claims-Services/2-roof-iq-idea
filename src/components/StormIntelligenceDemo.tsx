@@ -4,7 +4,6 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { CloudLightning, Wind, AlertTriangle, Activity, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { AddressSearch } from "./AddressSearch";
@@ -13,6 +12,7 @@ import { GeocodeResult } from '@/services/geocoding';
 import { Property, StormEvent, ProcessingJob } from '@/types/database';
 import { databaseService } from '@/services/database';
 import { weatherService } from '@/services/weather';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PropertyData {
   address: string;
@@ -36,19 +36,36 @@ export const StormIntelligenceDemo = () => {
   const [currentJob, setCurrentJob] = useState<ProcessingJob | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [mapboxToken, setMapboxToken] = useState('');
+  const [isLoadingToken, setIsLoadingToken] = useState(true);
 
-  // Use local state for Mapbox token
-  const MAPBOX_TOKEN = mapboxToken;
-  
-  // Debug logging
-  console.log('Debug - mapboxToken:', mapboxToken);
-  console.log('Debug - MAPBOX_TOKEN:', MAPBOX_TOKEN);
-  console.log('Debug - Should show address search:', !!MAPBOX_TOKEN);
+  // Fetch Mapbox token from Supabase on component mount
+  useEffect(() => {
+    const fetchMapboxToken = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+        
+        if (error) {
+          console.error('Failed to fetch Mapbox token:', error);
+          toast.error('Mapbox token not configured in Supabase secrets');
+        } else if (data?.token) {
+          setMapboxToken(data.token);
+          toast.success('Mapbox token loaded successfully');
+        }
+      } catch (error) {
+        console.error('Error fetching Mapbox token:', error);
+        toast.error('Failed to load Mapbox configuration');
+      } finally {
+        setIsLoadingToken(false);
+      }
+    };
+
+    fetchMapboxToken();
+  }, []);
 
   const initializeMap = (coordinates: [number, number]) => {
-    if (!mapContainer.current || !MAPBOX_TOKEN || map.current) return;
+    if (!mapContainer.current || !mapboxToken || map.current) return;
 
-    mapboxgl.accessToken = MAPBOX_TOKEN;
+    mapboxgl.accessToken = mapboxToken;
     
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -244,59 +261,53 @@ export const StormIntelligenceDemo = () => {
           </p>
         </div>
 
-        {/* Mapbox Token Input - Always visible at top */}
-        <Card className="p-8 mb-8 max-w-2xl mx-auto border-2 border-primary/20">
-          <div className="text-center mb-6">
-            <h3 className="text-xl font-semibold mb-2">🗺️ Enter Mapbox API Token</h3>
-            <p className="text-muted-foreground">
-              Get your free public token from <a href="https://mapbox.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline font-medium">mapbox.com</a> to enable maps and address search
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Input
-              type="text"
-              placeholder="Enter your Mapbox public token (pk.eyJ1...)"
-              value={mapboxToken}
-              onChange={(e) => setMapboxToken(e.target.value)}
-              className="flex-1 h-12 text-center"
-            />
-            <Button 
-              onClick={() => {
-                if (mapboxToken.trim()) {
-                  toast.success("Mapbox token configured! You can now search addresses.");
-                } else {
-                  toast.error("Please enter a valid Mapbox token.");
-                }
-              }}
-              disabled={!mapboxToken.trim()}
-              size="lg"
-              className="min-w-[120px]"
-            >
-              {mapboxToken ? 'Update' : 'Configure'}
-            </Button>
-          </div>
-          {mapboxToken && (
-            <div className="mt-4 p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
-              <p className="text-sm text-green-700 dark:text-green-300 text-center">
-                ✅ Mapbox configured! You can now search for addresses below.
+        {/* Status Card */}
+        {isLoadingToken && (
+          <Card className="p-8 mb-8 max-w-2xl mx-auto border-2 border-primary/20">
+            <div className="text-center">
+              <h3 className="text-xl font-semibold mb-2">🔑 Loading Mapbox Configuration...</h3>
+              <p className="text-muted-foreground">
+                Fetching your Mapbox token from Supabase secrets
               </p>
             </div>
-          )}
-        </Card>
+          </Card>
+        )}
+
+        {!isLoadingToken && !mapboxToken && (
+          <Card className="p-8 mb-8 max-w-2xl mx-auto border-2 border-destructive/20">
+            <div className="text-center">
+              <h3 className="text-xl font-semibold mb-2 text-destructive">⚠️ Mapbox Token Missing</h3>
+              <p className="text-muted-foreground mb-4">
+                Your Mapbox token is not configured in Supabase secrets. Please add your MAPBOX_PUBLIC_TOKEN to continue.
+              </p>
+              <Button asChild variant="outline">
+                <a href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noopener noreferrer">
+                  Get Mapbox Token
+                </a>
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {!isLoadingToken && mapboxToken && (
+          <Card className="p-8 mb-8 max-w-2xl mx-auto border-2 border-primary/20">
+            <div className="text-center">
+              <h3 className="text-xl font-semibold mb-2">✅ Mapbox Ready</h3>
+              <p className="text-muted-foreground">
+                Your Mapbox token is configured and ready to use
+              </p>
+            </div>
+          </Card>
+        )}
 
         {/* Address Search */}
-        <div className="mb-8">
-          <p className="text-center text-sm text-muted-foreground mb-4">
-            Debug: Token = "{mapboxToken}" | Show Search = {MAPBOX_TOKEN ? 'YES' : 'NO'}
-          </p>
-          {MAPBOX_TOKEN ? (
+        {!isLoadingToken && mapboxToken && (
+          <div className="mb-8">
             <div className="max-w-md mx-auto">
               <AddressSearch onAddressSelect={handleAddressSelect} />
             </div>
-          ) : (
-            <p className="text-center text-red-500">Address search hidden - token not detected</p>
-          )}
-        </div>
+          </div>
+        )}
 
         {selectedProperty && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
