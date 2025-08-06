@@ -9,7 +9,7 @@ export default function TestAPIs() {
   // Test Mapbox with hardcoded token (we KNOW this works)
   const testMapbox = () => {
     try {
-      mapboxgl.accessToken = 'pk.eyJ1IjoibWFpbG1vdmUiLCJhIjoiY20wZnhrbjV3MDVkNTJrcjF1MjlpaWFqZiJ9.xKwF94J4sYw-AEfGXcoUHg';
+      mapboxgl.accessToken = 'pk.eyJ1IjoiZnRkY2FkIiwiYSI6ImNtZTBsZ2w1dTA2ajcyam9oN2ZpejNqdWYifQ.yLDH0BiGgnK_UuXrzEHHVg';
       
       const map = new mapboxgl.Map({
         container: 'mapbox-test',
