@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import mapboxgl from 'mapbox-gl';
+import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
 function App() {
   const [address, setAddress] = useState('');
@@ -30,6 +32,24 @@ function App() {
         center: [-74.0060, 40.7128], // NYC for now
         zoom: 20,
         pitch: 0
+      });
+
+      // Add drawing controls
+      const draw = new MapboxDraw({
+        displayControlsDefault: false,
+        controls: {
+          polygon: true,
+          trash: true
+        }
+      });
+      
+      map.addControl(draw);
+
+      // Listen for when drawing is completed
+      map.on('draw.create', (e: any) => {
+        const feature = e.features[0];
+        console.log('Roof outline drawn:', feature);
+        console.log('Polygon coordinates:', feature.geometry.coordinates);
       });
 
       // Cleanup function
@@ -93,6 +113,9 @@ function App() {
                 <h3 className="text-lg font-medium text-gray-900 mb-3">
                   Satellite View
                 </h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  Click to trace the roof outline. Double-click to complete.
+                </p>
                 <div 
                   id="map" 
                   className="w-full h-96 rounded-lg shadow-lg"
