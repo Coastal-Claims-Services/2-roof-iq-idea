@@ -3,9 +3,16 @@ import { useState } from 'react';
 function App() {
   const [address, setAddress] = useState('');
   const [submittedAddress, setSubmittedAddress] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleMeasureRoof = () => {
+    setIsLoading(true);
     setSubmittedAddress(address);
+    
+    // Simulate loading
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 2000);
   };
 
   return (
@@ -38,7 +45,18 @@ function App() {
             Measure Roof
           </button>
           
-          {submittedAddress && (
+          {isLoading && (
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-sm text-blue-700">
+                  Initializing satellite view...
+                </p>
+              </div>
+            </div>
+          )}
+          
+          {submittedAddress && !isLoading && (
             <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-md">
               <h3 className="text-sm font-medium text-green-800 mb-1">
                 Selected Address:
