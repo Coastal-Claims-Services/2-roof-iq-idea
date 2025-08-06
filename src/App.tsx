@@ -30,10 +30,11 @@ function App() {
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<google.maps.places.PlaceResult | null>(null);
 
-  // Load Google Places API
+  // Load Google Places API only when we have the API key
   const { isLoaded: googleLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: googleApiKey || '',
+    googleMapsApiKey: googleApiKey || undefined,
     libraries,
+    preventGoogleFontsLoading: true,
   });
 
   const handleMeasureRoof = () => {
@@ -187,6 +188,12 @@ function App() {
     if (submittedAddress && !isLoading && mapboxToken) {
       const initializeMap = async () => {
         try {
+          // Clean up existing map first
+          if (mapRef.current) {
+            mapRef.current.remove();
+            mapRef.current = null;
+          }
+
           // Set access token
           mapboxgl.accessToken = mapboxToken;
           
@@ -200,6 +207,12 @@ function App() {
             };
           } else {
             coords = await geocodeAddress(submittedAddress);
+          }
+          
+          // Ensure map container exists
+          const mapContainer = document.getElementById('map');
+          if (!mapContainer) {
+            throw new Error('Map container not found');
           }
           
           // Initialize map
@@ -255,11 +268,11 @@ function App() {
             });
           });
 
-          // Cleanup function
-          return () => {
-            mapRef.current = null;
-            map.remove();
-          };
+          // Map load success
+          map.on('load', () => {
+            console.log('Map loaded successfully');
+          });
+
         } catch (error) {
           console.error('Failed to initialize map:', error);
           alert('Failed to find address. Please try a different address.');
@@ -267,6 +280,14 @@ function App() {
       };
       
       initializeMap();
+      
+      // Cleanup function
+      return () => {
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+        }
+      };
     }
   }, [submittedAddress, isLoading, mapboxToken]);
 
@@ -313,7 +334,39 @@ function App() {
     );
   }
 
-  console.log('Rendering main app UI', { mapboxToken, googleApiKey, googleLoaded });
+  console.log('Rendering main app UI', { mapboxToken, googleApiKey, googleLoaded, loadError });
+
+  // Show Google API loading error
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-8">RoofIQ</h1>
+          <div className="p-4 bg-red-50 border border-red-200 rounded-md mb-4">
+            <p className="text-sm text-red-700">Failed to load Google Maps API</p>
+          </div>
+          <button onClick={() => window.location.reload()} className="w-full bg-blue-600 text-white py-2 px-4 rounded-md font-medium hover:bg-blue-700">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render the main UI until we have both API keys
+  if (!mapboxToken || !googleApiKey) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-8">RoofIQ</h1>
+          <div className="flex items-center justify-center space-x-2">
+            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-sm text-gray-700">Loading API keys...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -327,7 +380,7 @@ function App() {
             <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">
               Property Address
             </label>
-            {googleLoaded ? (
+            {googleLoaded && googleApiKey ? (
               <Autocomplete
                 onLoad={(autocomplete) => {
                   autocompleteRef.current = autocomplete;
@@ -348,14 +401,20 @@ function App() {
                 />
               </Autocomplete>
             ) : (
-              <input
-                id="address"
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Enter property address..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+              <div className="relative">
+                <input
+                  id="address"
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Loading Google Places..."
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50"
+                />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              </div>
             )}
           </div>
           
