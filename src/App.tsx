@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { useLoadScript } from '@react-google-maps/api';
+import { useLoadScript, Autocomplete } from '@react-google-maps/api';
 import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import * as turf from '@turf/turf';
@@ -27,8 +27,8 @@ function App() {
     perimeter: string;
   } | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-  const autocompleteRef = useRef<any>(null);
-  const [selectedPlace, setSelectedPlace] = useState<any>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<google.maps.places.PlaceResult | null>(null);
 
   // Load Google Places API
   const { isLoaded: googleLoaded, loadError } = useLoadScript({
@@ -164,46 +164,17 @@ function App() {
     pdf.save(`roof-report-${Date.now()}.pdf`);
   };
 
-  // Initialize Google Places Autocomplete
-  const initializeGooglePlaces = () => {
-    console.log('Initializing Google Places...', { googleLoaded, googleApiKey });
-    
-    if (googleLoaded && window.google?.maps?.places) {
-      const input = document.getElementById('address') as HTMLInputElement;
-      if (input && !autocompleteRef.current) {
-        console.log('Creating autocomplete instance...');
-        try {
-          autocompleteRef.current = new window.google.maps.places.Autocomplete(input, {
-            types: ['address'],
-            componentRestrictions: { country: 'us' }
-          });
-
-          autocompleteRef.current.addListener('place_changed', () => {
-            const place = autocompleteRef.current.getPlace();
-            console.log('Place selected:', place);
-            if (place && place.geometry) {
-              setSelectedPlace(place);
-              setAddress(place.formatted_address || '');
-            }
-          });
-          
-          console.log('Google Places autocomplete initialized successfully');
-        } catch (error) {
-          console.error('Error initializing Google Places:', error);
-        }
+  // Handle place selection from Google Places Autocomplete
+  const onPlaceChanged = () => {
+    if (autocompleteRef.current) {
+      const place = autocompleteRef.current.getPlace();
+      console.log('Place selected:', place);
+      if (place && place.geometry) {
+        setSelectedPlace(place);
+        setAddress(place.formatted_address || '');
       }
     }
   };
-
-  // Initialize Google Places when ready
-  useEffect(() => {
-    if (googleLoaded && googleApiKey) {
-      console.log('Google Places API loaded, initializing...');
-      initializeGooglePlaces();
-    } else if (loadError) {
-      console.error('Error loading Google Places API:', loadError);
-    }
-  }, [googleLoaded, googleApiKey, loadError]);
 
   // Fetch API keys on component mount
   useEffect(() => {
@@ -222,9 +193,10 @@ function App() {
           // Get coordinates from Google Places if available, otherwise use Mapbox geocoding
           let coords;
           if (selectedPlace && selectedPlace.geometry) {
+            const location = selectedPlace.geometry.location;
             coords = {
-              lat: selectedPlace.geometry.location.lat(),
-              lng: selectedPlace.geometry.location.lng()
+              lat: typeof location.lat === 'function' ? location.lat() : location.lat,
+              lng: typeof location.lng === 'function' ? location.lng() : location.lng
             };
           } else {
             coords = await geocodeAddress(submittedAddress);
@@ -355,14 +327,36 @@ function App() {
             <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">
               Property Address
             </label>
-            <input
-              id="address"
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="Enter property address..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+            {googleLoaded ? (
+              <Autocomplete
+                onLoad={(autocomplete) => {
+                  autocompleteRef.current = autocomplete;
+                }}
+                onPlaceChanged={onPlaceChanged}
+                options={{
+                  types: ['address'],
+                  componentRestrictions: { country: 'us' }
+                }}
+              >
+                <input
+                  id="address"
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Enter property address..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </Autocomplete>
+            ) : (
+              <input
+                id="address"
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Enter property address..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            )}
           </div>
           
           <button
