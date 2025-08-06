@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useState, useEffect } from 'react';
 import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
+import * as turf from '@turf/turf';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
@@ -9,15 +10,36 @@ function App() {
   const [address, setAddress] = useState('');
   const [submittedAddress, setSubmittedAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [measurements, setMeasurements] = useState<{
+    area: string;
+    squares: string;
+    perimeter: string;
+  } | null>(null);
 
   const handleMeasureRoof = () => {
     setIsLoading(true);
-    setSubmittedAddress(address);
+    setMeasurements(null); // Reset measurements
     
     // Simulate loading
     setTimeout(() => {
       setIsLoading(false);
     }, 2000);
+  };
+
+  // Calculate perimeter in feet
+  const calculatePerimeter = (feature: any) => {
+    const coordinates = feature.geometry.coordinates[0];
+    let perimeter = 0;
+    
+    for (let i = 0; i < coordinates.length - 1; i++) {
+      const from = coordinates[i];
+      const to = coordinates[i + 1];
+      const distance = turf.distance(from, to, 'metres');
+      perimeter += distance;
+    }
+    
+    // Convert meters to feet (1 meter = 3.28084 feet)
+    return (perimeter * 3.28084).toFixed(0);
   };
 
   // Initialize Mapbox when address is shown
@@ -49,8 +71,31 @@ function App() {
       // Listen for when drawing is completed
       map.on('draw.create', (e: any) => {
         const feature = e.features[0];
-        console.log('Roof outline drawn:', feature);
-        console.log('Polygon coordinates:', feature.geometry.coordinates);
+        
+        // Calculate area in square meters
+        const areaMeters = turf.area(feature);
+        
+        // Convert to square feet (1 meter = 3.28084 feet, so 1 sq meter = 10.764 sq feet)
+        const areaFeet = areaMeters * 10.764;
+        
+        // Calculate roofing squares (1 square = 100 sq ft)
+        const squares = (areaFeet / 100).toFixed(2);
+        
+        // Calculate perimeter
+        const perimeter = calculatePerimeter(feature);
+        
+        // Display the results
+        setMeasurements({
+          area: areaFeet.toFixed(0),
+          squares: squares,
+          perimeter: perimeter
+        });
+        
+        console.log('Roof measurements:', {
+          area: areaFeet.toFixed(0) + ' sq ft',
+          squares: squares + ' squares',
+          perimeter: perimeter + ' ft'
+        });
       });
 
       // Cleanup function
@@ -123,6 +168,28 @@ function App() {
                   style={{ height: '400px', marginTop: '20px' }}
                 />
               </div>
+              
+              {measurements && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                  <h3 className="text-lg font-medium text-blue-900 mb-3">
+                    Roof Measurements
+                  </h3>
+                  <div className="grid grid-cols-1 gap-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-blue-700">Total Area:</span>
+                      <span className="font-medium text-blue-900">{measurements.area} sq ft</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-blue-700">Roofing Squares:</span>
+                      <span className="font-medium text-blue-900">{measurements.squares}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-blue-700">Perimeter:</span>
+                      <span className="font-medium text-blue-900">{measurements.perimeter} ft</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
