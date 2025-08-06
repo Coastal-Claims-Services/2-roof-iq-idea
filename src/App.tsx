@@ -64,40 +64,75 @@ function App() {
     return (perimeter * 3.28084).toFixed(0);
   };
 
-  // Fetch API keys from Supabase Edge Functions
-  const fetchApiKeys = async () => {
+  // Fetch API keys from Supabase Edge Functions with timeout and retry logic
+  const fetchApiKeys = async (retryCount = 0) => {
+    const maxRetries = 2;
+    const timeout = 10000; // 10 seconds
+    
     try {
-      console.log('Fetching API keys...');
+      console.log(`Fetching API keys... (attempt ${retryCount + 1}/${maxRetries + 1})`);
       setIsInitializing(true);
       setApiKeysError(null);
       
-      const [mapboxResponse, googleResponse] = await Promise.all([
-        supabase.functions.invoke('get-mapbox-token'),
-        supabase.functions.invoke('get-google-api-key')
-      ]);
+      // Create timeout promise
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), timeout)
+      );
+      
+      // Race between API calls and timeout
+      const [mapboxResponse, googleResponse] = await Promise.race([
+        Promise.all([
+          supabase.functions.invoke('get-mapbox-token'),
+          supabase.functions.invoke('get-google-api-key')
+        ]),
+        timeoutPromise
+      ]) as any;
       
       console.log('Mapbox response:', mapboxResponse);
       console.log('Google response:', googleResponse);
       
+      // Check for network-level errors
       if (mapboxResponse.error) {
         console.error('Mapbox error:', mapboxResponse.error);
-        throw new Error(`Failed to fetch Mapbox token: ${mapboxResponse.error.message}`);
+        throw new Error(`Mapbox API error: ${JSON.stringify(mapboxResponse.error)}`);
       }
       
       if (googleResponse.error) {
         console.error('Google error:', googleResponse.error);
-        throw new Error(`Failed to fetch Google API key: ${googleResponse.error.message}`);
+        throw new Error(`Google API error: ${JSON.stringify(googleResponse.error)}`);
+      }
+      
+      // Check for missing data
+      if (!mapboxResponse.data?.token) {
+        throw new Error('Mapbox token not found in response');
+      }
+      
+      if (!googleResponse.data?.apiKey) {
+        throw new Error('Google API key not found in response');
       }
       
       console.log('Setting API keys...');
-      setMapboxToken(mapboxResponse.data?.token);
-      setGoogleApiKey(googleResponse.data?.apiKey);
+      setMapboxToken(mapboxResponse.data.token);
+      setGoogleApiKey(googleResponse.data.apiKey);
       console.log('API keys set successfully');
+      
     } catch (error) {
       console.error('Error fetching API keys:', error);
-      setApiKeysError(error instanceof Error ? error.message : 'Failed to load API keys. Please try again.');
+      
+      // Retry logic
+      if (retryCount < maxRetries) {
+        console.log(`Retrying in 2 seconds... (${retryCount + 1}/${maxRetries})`);
+        setTimeout(() => fetchApiKeys(retryCount + 1), 2000);
+        return;
+      }
+      
+      // Final error after all retries
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setApiKeysError(`Failed to load API keys after ${maxRetries + 1} attempts: ${errorMessage}`);
     } finally {
-      setIsInitializing(false);
+      if (retryCount === 0) {
+        setIsInitializing(false);
+      }
     }
   };
 
@@ -320,15 +355,34 @@ function App() {
           <h1 className="text-3xl font-bold text-gray-900 mb-8">
             RoofIQ
           </h1>
-          <div className="p-4 bg-red-50 border border-red-200 rounded-md mb-4">
-            <p className="text-sm text-red-700">{apiKeysError}</p>
+          <div className="p-4 bg-red-50 border border-red-200 rounded-md mb-6">
+            <h3 className="text-sm font-medium text-red-800 mb-2">Error Details:</h3>
+            <p className="text-sm text-red-700 mb-4">{apiKeysError}</p>
+            <details className="text-left">
+              <summary className="cursor-pointer text-xs text-red-600 hover:text-red-800">
+                Technical Details
+              </summary>
+              <div className="mt-2 text-xs text-red-600 font-mono bg-red-100 p-2 rounded">
+                <p>Mapbox Token: {mapboxToken ? '✓ Available' : '✗ Missing'}</p>
+                <p>Google API Key: {googleApiKey ? '✓ Available' : '✗ Missing'}</p>
+                <p>Timestamp: {new Date().toISOString()}</p>
+              </div>
+            </details>
           </div>
-          <button
-            onClick={fetchApiKeys}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-          >
-            Retry
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={() => fetchApiKeys()}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-gray-300 text-gray-700 py-2 px-4 rounded-md font-medium hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+            >
+              Refresh Page
+            </button>
+          </div>
         </div>
       </div>
     );
