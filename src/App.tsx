@@ -6,6 +6,8 @@ import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import * as turf from '@turf/turf';
 import { jsPDF } from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
+import RoofIQBeta from '@/components/RoofIQBeta';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
@@ -361,11 +363,23 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
-        <h1 className="text-3xl font-bold text-center text-gray-900 mb-8">
-          RoofIQ
-        </h1>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto p-4">
+        <Tabs defaultValue="beta" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-8">
+            <TabsTrigger value="beta">RoofIQ Beta</TabsTrigger>
+            <TabsTrigger value="measure">Classic Measure</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="beta" className="space-y-0">
+            <RoofIQBeta />
+          </TabsContent>
+          
+          <TabsContent value="measure" className="space-y-0">
+            <div className="max-w-md mx-auto bg-card rounded-lg shadow-lg p-8">
+              <h1 className="text-3xl font-bold text-center mb-8">
+                RoofIQ Classic
+              </h1>
         
         <div className="space-y-6">
           <div>
@@ -483,7 +497,10 @@ function App() {
               )}
             </div>
           )}
-        </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
