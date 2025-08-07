@@ -27,6 +27,7 @@ interface LearningComparison {
 }
 
 const RoofIQBeta: React.FC = () => {
+  console.log('=== ROOFIQ BETA COMPONENT RENDERING ===');
   const [currentPrediction, setCurrentPrediction] = useState<RoofPrediction>({
     facets: 12,
     area: 3500,
