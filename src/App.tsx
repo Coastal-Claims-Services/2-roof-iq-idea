@@ -1,13 +1,12 @@
 import React from 'react';
+import RoofIQBeta from './components/RoofIQBeta';
 
 function App() {
-  console.log('=== APP COMPONENT RENDERING ===');
-  
   return (
-    <div style={{ padding: '20px', backgroundColor: 'white', color: 'black', minHeight: '100vh' }}>
-      <h1>RoofIQ App - Debug Mode</h1>
-      <p>If you can see this, the app is working!</p>
-      <p>Current time: {new Date().toLocaleString()}</p>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto py-8">
+        <RoofIQBeta />
+      </div>
     </div>
   );
 }
